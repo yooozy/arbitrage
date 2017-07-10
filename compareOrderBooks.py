@@ -1,4 +1,4 @@
-from time import strftime
+from time import strftime, sleep
 import krakenex
 import gdax
 import collections
@@ -49,37 +49,42 @@ def main():
     k = krakenex.API()
     g = gdax.PublicClient()
 
-    for ticker in gdax_ticker:
-        # [price, size, num_orders]
-        gdax_bid = (g.get_product_order_book(gdax_ticker[ticker]))["bids"][0]
-        gdax_ask = (g.get_product_order_book(gdax_ticker[ticker]))["asks"][0]
+    while True:
+        for ticker in gdax_ticker:
+            # [price, size, num_orders]
+            gdax_bid = (g.get_product_order_book(
+                gdax_ticker[ticker]))["bids"][0]
+            gdax_ask = (g.get_product_order_book(
+                gdax_ticker[ticker]))["asks"][0]
 
-        # [price, volume, timestamp]
-        kraken_bid = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
-            "result"][kraken_ticker[ticker]]["bids"][0]
-        kraken_ask = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
-            "result"][kraken_ticker[ticker]]["asks"][0]
+            # [price, volume, timestamp]
+            kraken_bid = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
+                "result"][kraken_ticker[ticker]]["bids"][0]
+            kraken_ask = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
+                "result"][kraken_ticker[ticker]]["asks"][0]
 
-        # print (gdax_bid, gdax_ask, kraken_bid, kraken_ask)
-        if (gdax_bid > kraken_ask):
-            # normalize bid/ask data into floats and [price, volume only]
-            spread = Spread(
-                ticker,
-                [float(gdax_bid[0]), float(gdax_bid[1])],
-                [float(kraken_ask[0]), float(kraken_ask[1])]
-            )
-            print ("Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
-                                                           ) + ", Max Profit: " + str(spread.get_max_profit()))
+            # print (gdax_bid, gdax_ask, kraken_bid, kraken_ask)
+            if (gdax_bid > kraken_ask):
+                # normalize bid/ask data into floats and [price, volume only]
+                spread = Spread(
+                    ticker,
+                    [float(gdax_bid[0]), float(gdax_bid[1])],
+                    [float(kraken_ask[0]), float(kraken_ask[1])]
+                )
+                print ("Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
+                                                               ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + gdax_bid[0] + ", BidVolume: " + gdax_bid[1] + ", Ask: " + kraken_ask[0] + ", AskVolume: " + kraken_ask[1])
 
-        if (kraken_bid > gdax_ask):
-            # normalize bid/ask data into floats and [price, volume only]
-            spread = Spread(
-                ticker,
-                [float(kraken_bid[0]), float(kraken_bid[1])],
-                [float(gdax_ask[0]), float(gdax_ask[1])]
-            )
-            print ("Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
-                                                           ) + ", Max Profit: " + str(spread.get_max_profit()))
+            if (kraken_bid > gdax_ask):
+                # normalize bid/ask data into floats and [price, volume only]
+                spread = Spread(
+                    ticker,
+                    [float(kraken_bid[0]), float(kraken_bid[1])],
+                    [float(gdax_ask[0]), float(gdax_ask[1])]
+                )
+                print ("Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
+                                                               ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + kraken_bid[0] + ", BidVolume: " + kraken_bid[1] + ", Ask: " + gdax_ask[0] + ", AskVolume: " + gdax_ask[1])
+
+        sleep(10)
 
 
 if __name__ == "__main__":
