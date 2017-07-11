@@ -80,6 +80,8 @@ def compare_order_books():
         kraken_ask = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
             "result"][kraken_ticker[ticker]]["asks"][0]
 
+        spread_stats = {}
+
         # print (gdax_bid, gdax_ask, kraken_bid, kraken_ask)
         if (gdax_bid > kraken_ask):
             # normalize bid/ask data into floats and [price, volume only]
