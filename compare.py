@@ -3,6 +3,8 @@ import krakenex
 import gdax
 from google.cloud import datastore
 
+import logging
+
 
 class Spread:
     def __init__(self, ticker, bid=0, ask=0):
@@ -43,12 +45,7 @@ class Datastore:
         self.client.put(entity)
 
 
-def datastore_config():
-    # Instantiates a client
-    datastore_client = datastore.Client()
-
-
-def main():
+def compare_order_books():
     # GDAX ticker symbols
     gdax_ticker = {"BTCtoUSD": "BTC-USD",
                    "ETHtoUSD": "ETH-USD",
@@ -69,6 +66,7 @@ def main():
     g = gdax.PublicClient()
     datastore_client = Datastore(datastore.Client())
 
+    output = ""
     for ticker in gdax_ticker:
         # [price, size, num_orders]
         gdax_bid = (g.get_product_order_book(
@@ -125,9 +123,11 @@ def main():
         string = ""
         for stat in spread_stats:
             string = string + stat + ": " + str(spread_stats[stat]) + ", "
+        output = output + string + " / "
         print(string)
         datastore_client.store(spread_stats)
+    return output
 
 
 if __name__ == "__main__":
-    main()
+    compare_order_books()
