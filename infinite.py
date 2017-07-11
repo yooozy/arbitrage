@@ -5,7 +5,7 @@ from time import strftime, sleep
 def loop():
     while True:
         compare_order_books()
-        sleep(30)
+        sleep(180)
 
 
 if __name__ == "__main__":
