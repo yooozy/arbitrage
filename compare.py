@@ -167,8 +167,8 @@ def compare_order_books():
             bittrex_ask = [(b.getorderbook(bittrex_ticker[ticker], 'sell', depth=1))[0]['Rate'],
                            (b.getorderbook(bittrex_ticker[ticker], 'sell', depth=1))[0]['Quantity']]
 
-            print (gdax_bid, gdax_ask, kraken_bid,
-                   kraken_ask, bittrex_bid, bittrex_ask)
+            # print (gdax_bid, gdax_ask, kraken_bid,
+            #        kraken_ask, bittrex_bid, bittrex_ask)
 
             # Key is exchange, Value is bid list: [price, volumn]
             dict_bid = {"GDAX": gdax_bid,
@@ -196,7 +196,9 @@ def compare_order_books():
                         spread = Spread(
                             ticker,
                             [float(bid), float(bid_volume)],
-                            [float(ask), float(ask_volume)]
+                            [float(ask), float(ask_volume)],
+                            exchange_bid,
+                            exchange_ask
                         )
                         print ("Exchanges: " + exchange_bid + " to " + exchange_ask + ", Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
                                                                                                                                 ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + bid + ", BidVolume: " + bid_volume + ", Ask: " + ask + ", AskVolume: " + ask_volume)
@@ -220,9 +222,8 @@ def compare_order_books():
                         output = output + string + " / "
                         print(string)
                         datastore_client.store(spread_stats)
-
-        except:
-            print("Error, continuing loop")
+        except requests.exceptions.HTTPError as err:
+            print (err)
 
     return output
 
