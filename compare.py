@@ -145,7 +145,7 @@ def compare_order_books():
     g = gdax.PublicClient()
     b = bittrex('9f7d4a9a4879422ababd4e2c1710b692',
                 '3c4e4c0ab06a4ff7b9cc04cbbf7d82af')
-    #datastore_client = Datastore(datastore.Client())
+    datastore_client = Datastore(datastore.Client())
 
     output = ""
     for ticker in selected_ticker:
