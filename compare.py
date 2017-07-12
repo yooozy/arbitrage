@@ -3,7 +3,7 @@ import krakenex
 import gdax
 from bittrex import bittrex
 from google.cloud import datastore
-import requests
+import http.client
 
 import logging
 
@@ -219,8 +219,9 @@ def compare_order_books():
                         output = output + string + " / "
                         print(string)
                         datastore_client.store(spread_stats)
-        except requests.exceptions.HTTPError as err:
-            print (err)
+        except http.client.HTTPException as err:
+            print ("Got error: " + err + " , continuing loop.")
+            exit()
 
     return output
 
