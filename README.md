@@ -14,9 +14,7 @@ Trading bot implementing arbitrage algorithm.
 
 `python3 ./setup.py install`
 
-* Bittrex API (https://github.com/ericsomdahl/python-bittrex)
-
-`python3 ./setup.py install`
+* Bittrex API (https://github.com/ndri/python-bittrex)
 
 * Google Cloud Datastore SDK
 
