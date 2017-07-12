@@ -1,6 +1,7 @@
 from time import strftime, sleep, time
 import krakenex
 import gdax
+from bittrex import bittrex
 from google.cloud import datastore
 
 import logging
@@ -50,86 +51,108 @@ def compare_order_books():
     gdax_ticker = {"BTCtoUSD": "BTC-USD",
                    "ETHtoUSD": "ETH-USD",
                    "ETHtoBTC": "ETH-BTC",
-                   "LTCtoUSD": "LTC-USD",
+                   #"LTCtoUSD": "LTC-USD",
                    "LTCtoBTC": "LTC-BTC"}
 
     # Kraken ticker symbols
     kraken_ticker = {"BTCtoUSD": "XXBTZUSD",
                      "ETHtoUSD": "XETHZUSD",
                      "ETHtoBTC": "XETHXXBT",
-                     "LTCtoUSD": "XLTCZUSD",
+                     #"LTCtoUSD": "XLTCZUSD",
                      "LTCtoBTC": "XLTCXXBT"}
+
+    # Bittrex ticker symbols
+    bittrex_ticker = {"BTCtoUSD": "USDT-BTC",
+                     "ETHtoUSD": "USDT-ETH",
+                     "ETHtoBTC": "BTC-ETH",
+                     "LTCtoBTC": "BTC-LTC"}
 
     # Construct default dict to store ask/bid prices of individual exchange
 
     k = krakenex.API()
     g = gdax.PublicClient()
+    b = bittrex('9f7d4a9a4879422ababd4e2c1710b692', '3c4e4c0ab06a4ff7b9cc04cbbf7d82af')
     datastore_client = Datastore(datastore.Client())
 
     output = ""
     for ticker in gdax_ticker:
         try:
-            # [price, size, num_orders]
+            # gdax: [price, size, num_orders]
             gdax_bid = (g.get_product_order_book(
                 gdax_ticker[ticker]))["bids"][0]
             gdax_ask = (g.get_product_order_book(
                 gdax_ticker[ticker]))["asks"][0]
 
-            # [price, volume, timestamp]
+            # kraken: [price, volume, timestamp]
             kraken_bid = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
                 "result"][kraken_ticker[ticker]]["bids"][0]
             kraken_ask = (k.query_public('Depth', {'pair': kraken_ticker[ticker]}))[
                 "result"][kraken_ticker[ticker]]["asks"][0]
 
-            spread_stats = {}
+            # bittrex: ['price', 'volumn']
+            bittrex_bid = [(b.getorderbook(bittrex_ticker[ticker],'buy',depth=1))[0]['Rate'],
+                               (b.getorderbook(bittrex_ticker[ticker],'buy',depth=1))[0]['Quantity'] ]
+            bittrex_ask = [(b.getorderbook(bittrex_ticker[ticker],'sell',depth=1))[0]['Rate'],
+                               (b.getorderbook(bittrex_ticker[ticker],'sell',depth=1))[0]['Quantity'] ]
 
-            # print (gdax_bid, gdax_ask, kraken_bid, kraken_ask)
-            if (gdax_bid > kraken_ask):
-                # normalize bid/ask data into floats and [price, volume only]
-                spread = Spread(
-                    ticker,
-                    [float(gdax_bid[0]), float(gdax_bid[1])],
-                    [float(kraken_ask[0]), float(kraken_ask[1])]
-                )
-                spread_stats = {
-                    "ticker": ticker,
-                    "delta": spread.get_delta(),
-                    "max_profit": spread.get_max_profit(),
-                    "bid": gdax_bid[0],
-                    "bid_volume": gdax_bid[1],
-                    "ask": kraken_ask[0],
-                    "ask_volume": kraken_ask[1],
-                    "time": time()
-                }
 
-            if (kraken_bid > gdax_ask):
-                # normalize bid/ask data into floats and [price, volume only]
-                spread = Spread(
-                    ticker,
-                    [float(kraken_bid[0]), float(kraken_bid[1])],
-                    [float(gdax_ask[0]), float(gdax_ask[1])]
-                )
-                spread_stats = {
-                    "ticker": ticker,
-                    "delta": spread.get_delta(),
-                    "max_profit": spread.get_max_profit(),
-                    "bid": kraken_bid[0],
-                    "bid_volume": kraken_bid[1],
-                    "ask": gdax_ask[0],
-                    "ask_volume": gdax_ask[1],
-                    "time": time()
-                }
+            #print (gdax_bid, gdax_ask, kraken_bid, kraken_ask, bittrex_bid, bittrex_ask)
 
-            string = ""
-            if spread_stats:
-                for stat in spread_stats:
-                    string = string + stat + ": " + \
-                        str(spread_stats[stat]) + ", "
-                output = output + string + " / "
-                print(string)
-                datastore_client.store(spread_stats)
+            # Key is exchange, Value is bid list: [price, volumn]
+            dict_bid = {"GDAX": gdax_bid,
+                        "Kraken": kraken_bid,
+                        "Bittrex": bittrex_bid }
+
+            # Key is exchange, Value is ask list: [price, volumn]
+            dict_ask = {"GDAX": gdax_ask,
+                        "Kraken": kraken_ask,
+                        "Bittrex": bittrex_ask }
+
+            for exchange_bid in dict_bid:
+
+                for exchange_ask in dict_ask:
+
+                    spread_stats = {}
+                    bid = str(dict_bid[exchange_bid][0])
+                    ask = str(dict_ask[exchange_ask][0])
+
+                    if bid > ask:
+
+                        bid_volume = str(dict_bid[exchange_bid][1])
+                        ask_volume = str(dict_ask[exchange_ask][1])
+
+                        spread = Spread(
+                            ticker,
+                            [float(bid), float(bid_volume)],
+                            [float(ask), float(ask_volume)]
+                        )
+                        print ("Exchanges: " + exchange_bid + " to " + exchange_ask + ", Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
+                                                               ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + bid + ", BidVolume: " + bid_volume + ", Ask: " + ask + ", AskVolume: " + ask_volume)
+
+                        spread_stats = {
+                            "ticker": ticker,
+                            "delta": spread.get_delta(),
+                            "max_profit": spread.get_max_profit(),
+                            "bid": bid,
+                            "bid_volume": bid_volume,
+                            "ask": ask,
+                            "ask_volume": ask_volume,
+                            "time": time()
+                        }
+
+                    string = ""
+                    if spread_stats:
+                        for stat in spread_stats:
+                            string = string + stat + ": " + \
+                                str(spread_stats[stat]) + ", "
+                        output = output + string + " / "
+                        print(string)
+                        datastore_client.store(spread_stats)
+
+
         except:
             print("Error, continuing loop")
+
     return output
 
 
