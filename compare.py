@@ -7,6 +7,9 @@ import http.client
 
 import logging
 
+# Selected ticker symbols - only tickers in the following list will be triggered
+# Currently supported: BTCtoUSD, ETHtoUSD, LTCtoUSD, ETHtoBTC, LTCtoBTC
+selected_ticker = ["ETHtoUSD"]
 
 # GDAX ticker symbols
 gdax_ticker = {"BTCtoUSD": "BTC-USD",
@@ -142,10 +145,10 @@ def compare_order_books():
     g = gdax.PublicClient()
     b = bittrex('9f7d4a9a4879422ababd4e2c1710b692',
                 '3c4e4c0ab06a4ff7b9cc04cbbf7d82af')
-    datastore_client = Datastore(datastore.Client())
+    #datastore_client = Datastore(datastore.Client())
 
     output = ""
-    for ticker in gdax_ticker:
+    for ticker in selected_ticker:
         try:
             # gdax: [price, size, num_orders]
             gdax_bid = (g.get_product_order_book(
@@ -219,9 +222,9 @@ def compare_order_books():
                         output = output + string + " / "
                         print(string)
                         datastore_client.store(spread_stats)
+
         except http.client.HTTPException as err:
             print ("Got error: " + err + " , continuing loop.")
-            exit()
 
     return output
 
