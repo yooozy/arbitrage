@@ -3,6 +3,7 @@ import krakenex
 import gdax
 from bittrex import bittrex
 from google.cloud import datastore
+import requests
 
 import logging
 
@@ -108,14 +109,15 @@ class Spread:
     def get_delta(self):
         return self.bid[0] - self.ask[0]
 
-    def get_delta_percentage(self):
-        return
-
-    # Max profit is lesser of the two volumes times difference between bid and ask price
-    def get_max_profit(self):
+    def get_effective_volume(self):
         volume_to_use = self.ask[1]
         if (self.bid[1] < self.ask[1]):
             volume_to_use = self.bid[1]
+        return volume_to_use
+
+    # Max profit is lesser of the two volumes times difference between bid and ask price
+    def get_max_profit(self):
+        volume_to_use = self.get_effective_volume()
         # print ("Volume: " + str(volume_to_use) + " Bid: " + str(self.bid[0]) + " Ask: " + str(self.ask[0]) + " Delta: " + str(self.bid[0] - self.ask[0]))
         return (self.bid[0] - self.ask[0]) * volume_to_use
 
@@ -200,8 +202,6 @@ def compare_order_books():
                             exchange_bid,
                             exchange_ask
                         )
-                        print ("Exchanges: " + exchange_bid + " to " + exchange_ask + ", Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
-                                                                                                                                ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + bid + ", BidVolume: " + bid_volume + ", Ask: " + ask + ", AskVolume: " + ask_volume)
 
                         spread_stats = {
                             "ticker": ticker,
@@ -211,6 +211,7 @@ def compare_order_books():
                             "bid_volume": bid_volume,
                             "ask": ask,
                             "ask_volume": ask_volume,
+                            "effective_volume": spread.get_effective_volume(),
                             "time": time()
                         }
 
