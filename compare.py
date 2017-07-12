@@ -7,13 +7,101 @@ from google.cloud import datastore
 import logging
 
 
+# GDAX ticker symbols
+gdax_ticker = {"BTCtoUSD": "BTC-USD",
+               "ETHtoUSD": "ETH-USD",
+               "ETHtoBTC": "ETH-BTC",
+               #"LTCtoUSD": "LTC-USD",
+               "LTCtoBTC": "LTC-BTC"}
+
+# Kraken ticker symbols
+kraken_ticker = {"BTCtoUSD": "XXBTZUSD",
+                 "ETHtoUSD": "XETHZUSD",
+                 "ETHtoBTC": "XETHXXBT",
+                 #"LTCtoUSD": "XLTCZUSD",
+                 "LTCtoBTC": "XLTCXXBT"}
+
+# Bittrex ticker symbols
+bittrex_ticker = {"BTCtoUSD": "USDT-BTC",
+                  "ETHtoUSD": "USDT-ETH",
+                  "ETHtoBTC": "BTC-ETH",
+                  "LTCtoBTC": "BTC-LTC"}
+
+
+class TradeExecutor:
+    def __init__(self, gdax_auth_client, kraken_auth_client):
+        # TODO get creds from separate file (key, b64secret, passphrase)
+        self.gdax_auth_client = gdax_auth_client
+        self.kraken_auth_client = kraken_auth_client
+
+    def execute_spread(self, spread):
+        volume_to_use = spread.ask[1]
+        if (spread.bid[1] < spread.ask[1]):
+            volume_to_use = spread.bid[1]
+
+        # BID ORDER, EXECUTE SELL
+        if spread.bid_exchange == "GDAX":
+            ticker = gdax_ticker[spread.ticker]
+            print ("Executing sell order on GDAX... Price: {}, Size: {}, Ticker: {}".format(
+                str(spread.ask), str(volume_to_use), ticker))
+            # TODO are these the best parameters? Maybe GTT and cancel after 5 minutes
+            response = self.gdax_auth_client.sell(
+                price=str(spread.ask),
+                size=str(volume_to_use),
+                product_id=ticker,
+                time_in_force="IOC"
+            )
+            print (response)
+        elif spread.bid_exchange == "Kraken":
+            ticker = kraken_ticker[spread.ticker]
+            print ("Executing sell order on Kraken... Price: {}, Size: {}, Ticker: {}".format(
+                str(spread.ask), str(volume_to_use), ticker))
+            response = self.kraken_auth_client.query_private("AddOrder", {
+                "pair": ticker,
+                "type": "buy",
+                "ordertype": "limit",
+                "price": str(spread.ask),
+                "volume": str(volume_to_use),
+                "expiretm": "+60"
+            })
+            print (response)
+
+        # ASK ORDER, EXECUTE BUY
+        if spread.ask_exchange == "GDAX":
+            ticker = gdax_ticker[spread.ticker]
+            print ("Executing buy order on GDAX... Price: {}, Size: {}, Ticker: {}".format(
+                str(spread.bid), str(volume_to_use), ticker))
+            # TODO are these the best parameters? Maybe GTT and cancel after 5 minutes
+            response = self.gdax_auth_client.buy(
+                price=str(spread.bid),
+                size=str(volume_to_use),
+                product_id=ticker,
+                time_in_force="IOC"
+            )
+            print (response)
+        elif spread.ask_exchange == "Kraken":
+            ticker = kraken_ticker[spread.ticker]
+            print ("Executing sell order on Kraken... Price: {}, Size: {}, Ticker: {}".format(
+                str(spread.bid), str(volume_to_use), ticker))
+            response = self.kraken_auth_client.query_private("AddOrder", {
+                "pair": ticker,
+                "type": "sell",
+                "ordertype": "limit",
+                "price": str(spread.bid),
+                "volume": str(volume_to_use),
+                "expiretm": "+60"
+            })
+            print (response)
+
+
 class Spread:
-    def __init__(self, ticker, bid=0, ask=0):
+    def __init__(self, ticker, bid, ask, bid_exchange, ask_exchange):
         # bid/ask format [price, volume]
+        self.ticker = ticker
         self.bid = bid
         self.ask = ask
-
-        self.ticker = ticker
+        self.bid_exchange = bid_exchange
+        self.ask_exchange = ask_exchange
 
     # Delta is bid - ask. Bid is how much you can sell for,
     # ask is how little you can buy for, so we always want higher bids
@@ -31,6 +119,9 @@ class Spread:
         # print ("Volume: " + str(volume_to_use) + " Bid: " + str(self.bid[0]) + " Ask: " + str(self.ask[0]) + " Delta: " + str(self.bid[0] - self.ask[0]))
         return (self.bid[0] - self.ask[0]) * volume_to_use
 
+    def execute_spread(self):
+        pass
+
 
 class Datastore:
     def __init__(self, client, kind="Spread"):
@@ -47,31 +138,12 @@ class Datastore:
 
 
 def compare_order_books():
-    # GDAX ticker symbols
-    gdax_ticker = {"BTCtoUSD": "BTC-USD",
-                   "ETHtoUSD": "ETH-USD",
-                   "ETHtoBTC": "ETH-BTC",
-                   #"LTCtoUSD": "LTC-USD",
-                   "LTCtoBTC": "LTC-BTC"}
-
-    # Kraken ticker symbols
-    kraken_ticker = {"BTCtoUSD": "XXBTZUSD",
-                     "ETHtoUSD": "XETHZUSD",
-                     "ETHtoBTC": "XETHXXBT",
-                     #"LTCtoUSD": "XLTCZUSD",
-                     "LTCtoBTC": "XLTCXXBT"}
-
-    # Bittrex ticker symbols
-    bittrex_ticker = {"BTCtoUSD": "USDT-BTC",
-                     "ETHtoUSD": "USDT-ETH",
-                     "ETHtoBTC": "BTC-ETH",
-                     "LTCtoBTC": "BTC-LTC"}
-
     # Construct default dict to store ask/bid prices of individual exchange
 
     k = krakenex.API()
     g = gdax.PublicClient()
-    b = bittrex('9f7d4a9a4879422ababd4e2c1710b692', '3c4e4c0ab06a4ff7b9cc04cbbf7d82af')
+    b = bittrex('9f7d4a9a4879422ababd4e2c1710b692',
+                '3c4e4c0ab06a4ff7b9cc04cbbf7d82af')
     datastore_client = Datastore(datastore.Client())
 
     output = ""
@@ -90,23 +162,23 @@ def compare_order_books():
                 "result"][kraken_ticker[ticker]]["asks"][0]
 
             # bittrex: ['price', 'volumn']
-            bittrex_bid = [(b.getorderbook(bittrex_ticker[ticker],'buy',depth=1))[0]['Rate'],
-                               (b.getorderbook(bittrex_ticker[ticker],'buy',depth=1))[0]['Quantity'] ]
-            bittrex_ask = [(b.getorderbook(bittrex_ticker[ticker],'sell',depth=1))[0]['Rate'],
-                               (b.getorderbook(bittrex_ticker[ticker],'sell',depth=1))[0]['Quantity'] ]
+            bittrex_bid = [(b.getorderbook(bittrex_ticker[ticker], 'buy', depth=1))[0]['Rate'],
+                           (b.getorderbook(bittrex_ticker[ticker], 'buy', depth=1))[0]['Quantity']]
+            bittrex_ask = [(b.getorderbook(bittrex_ticker[ticker], 'sell', depth=1))[0]['Rate'],
+                           (b.getorderbook(bittrex_ticker[ticker], 'sell', depth=1))[0]['Quantity']]
 
-
-            #print (gdax_bid, gdax_ask, kraken_bid, kraken_ask, bittrex_bid, bittrex_ask)
+            print (gdax_bid, gdax_ask, kraken_bid,
+                   kraken_ask, bittrex_bid, bittrex_ask)
 
             # Key is exchange, Value is bid list: [price, volumn]
             dict_bid = {"GDAX": gdax_bid,
                         "Kraken": kraken_bid,
-                        "Bittrex": bittrex_bid }
+                        "Bittrex": bittrex_bid}
 
             # Key is exchange, Value is ask list: [price, volumn]
             dict_ask = {"GDAX": gdax_ask,
                         "Kraken": kraken_ask,
-                        "Bittrex": bittrex_ask }
+                        "Bittrex": bittrex_ask}
 
             for exchange_bid in dict_bid:
 
@@ -127,7 +199,7 @@ def compare_order_books():
                             [float(ask), float(ask_volume)]
                         )
                         print ("Exchanges: " + exchange_bid + " to " + exchange_ask + ", Ticker: " + ticker + ", Delta: " + str(spread.get_delta()
-                                                               ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + bid + ", BidVolume: " + bid_volume + ", Ask: " + ask + ", AskVolume: " + ask_volume)
+                                                                                                                                ) + ", Max Profit: " + str(spread.get_max_profit()) + ", Bid: " + bid + ", BidVolume: " + bid_volume + ", Ask: " + ask + ", AskVolume: " + ask_volume)
 
                         spread_stats = {
                             "ticker": ticker,
@@ -148,7 +220,6 @@ def compare_order_books():
                         output = output + string + " / "
                         print(string)
                         datastore_client.store(spread_stats)
-
 
         except:
             print("Error, continuing loop")
