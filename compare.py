@@ -36,10 +36,7 @@ class TradeExecutor:
         self.kraken_auth_client = kraken_auth_client
 
     def execute_spread(self, spread):
-        volume_to_use = spread.ask[1]
-        if (spread.bid[1] < spread.ask[1]):
-            volume_to_use = spread.bid[1]
-
+        volume_to_use = spread.get_effective_volume()
         # BID ORDER, EXECUTE SELL
         if spread.bid_exchange == "GDAX":
             ticker = gdax_ticker[spread.ticker]
@@ -118,7 +115,6 @@ class Spread:
     # Max profit is lesser of the two volumes times difference between bid and ask price
     def get_max_profit(self):
         volume_to_use = self.get_effective_volume()
-        # print ("Volume: " + str(volume_to_use) + " Bid: " + str(self.bid[0]) + " Ask: " + str(self.ask[0]) + " Delta: " + str(self.bid[0] - self.ask[0]))
         return (self.bid[0] - self.ask[0]) * volume_to_use
 
     def execute_spread(self):
